@@ -1,86 +1,108 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, SafeAreaView, Modal, ActivityIndicator, StatusBar } from 'react-native';
-import { Droplets, Layers, Trash2, Truck, Star, X, Plus, FileText } from 'lucide-react-native';
-import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
+import { StyleSheet, Text, View, ScrollView, TextInput, TouchableOpacity, SafeAreaView, StatusBar } from 'react-native';
 
+// Initial data structure
 const DEFAULT_COSTS = {
-  500: { lid: 125, eb: 30, gas: 360, labour: 50, packing: 50, maintenance: 20 },
-  750: { lid: 100, eb: 50, gas: 735, labour: 100, packing: 60, maintenance: 20 },
-  1000: { lid: 100, eb: 50, gas: 735, labour: 150, packing: 80, maintenance: 30 },
-  1500: { lid: 100, eb: 50, gas: 1470, labour: 150, packing: 80, maintenance: 30 },
-  2000: { lid: 125, eb: 50, gas: 1470, labour: 200, packing: 80, maintenance: 50 },
+  500: { lid: 125, eb: 30, gas: 360, labour: 50, packing: 50, maintenance: 20, transport: 50 },
+  750: { lid: 100, eb: 50, gas: 735, labour: 100, packing: 60, maintenance: 20, transport: 100 },
+  1000: { lid: 100, eb: 50, gas: 735, labour: 150, packing: 80, maintenance: 30, transport: 100 },
 };
-
-const TANK_SIZES = [500, 750, 1000, 1500, 2000];
 
 export default function App() {
   const [numLayers, setNumLayers] = useState(3);
   const [layerPrices, setLayerPrices] = useState([184, 71, 146, 0, 0]);
   const [tanks, setTanks] = useState([
-    { id: 1, size: 500, weights: [5, 3, 4.5, 0, 0], costs: { ...DEFAULT_COSTS[500], transport: 50 } }
+    { id: 1, size: 500, weights: [5, 3, 4.5, 0, 0], costs: DEFAULT_COSTS[500] }
   ]);
 
-  const formatCurrency = (amount) => `₹${parseFloat(amount || 0).toFixed(2)}`;
-
-  const handleWeightChange = (id, index, val) => {
-    setTanks(tanks.map(t => t.id === id ? { ...t, weights: t.weights.map((w, i) => i === index ? parseFloat(val) || 0 : w) } : t));
+  const updateWeight = (tankId, layerIndex, value) => {
+    setTanks(tanks.map(t => {
+      if (t.id === tankId) {
+        const newWeights = [...t.weights];
+        newWeights[layerIndex] = parseFloat(value) || 0;
+        return { ...t, weights: newWeights };
+      }
+      return t;
+    }));
   };
 
-  const handleCostChange = (id, field, val) => {
-    setTanks(tanks.map(t => t.id === id ? { ...t, costs: { ...t.costs, [field]: parseFloat(val) || 0 } } : t));
+  const updateCost = (tankId, field, value) => {
+    setTanks(tanks.map(t => {
+      if (t.id === tankId) {
+        return { ...t, costs: { ...t.costs, [field]: parseFloat(value) || 0 } };
+      }
+      return t;
+    }));
   };
 
-  const addTank = () => setTanks([...tanks, { id: Date.now(), size: 500, weights: [0,0,0,0,0], costs: { ...DEFAULT_COSTS[500], transport: 0 } }]);
+  const addTank = () => {
+    setTanks([...tanks, { id: Date.now(), size: 500, weights: [0, 0, 0, 0, 0], costs: DEFAULT_COSTS[500] }]);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ExpoStatusBar style="light" />
+      <StatusBar barStyle="light-content" />
       <View style={styles.header}><Text style={styles.headerTitle}>Tank Cost Calculator</Text></View>
+      
       <ScrollView contentContainerStyle={styles.scroll}>
-        
-        {/* Layer Input Section */}
+        {/* Layer Section */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>1. Layers & Material Price</Text>
-          <View style={styles.row}>
-            {[1,2,3,4,5].map(n => (
-              <TouchableOpacity key={n} onPress={() => setNumLayers(n)} style={[styles.btn, numLayers === n && styles.activeBtn]}>
-                <Text style={numLayers === n ? {color:'white'} : {}}>{n}</Text>
-              </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Layer Price Configuration (₹/kg)</Text>
+          <View style={styles.layerRow}>
+            {layerPrices.map((p, i) => (
+              <TextInput key={i} style={styles.miniInput} value={String(p)} onChangeText={(v) => {
+                const newPrices = [...layerPrices];
+                newPrices[i] = parseFloat(v) || 0;
+                setLayerPrices(newPrices);
+              }} placeholder={`L${i+1}`} keyboardType="numeric" />
             ))}
           </View>
         </View>
 
         {/* Tank List */}
-        {tanks.map(tank => (
+        {tanks.map((tank) => (
           <View key={tank.id} style={styles.card}>
-            <Text>Tank Size: {tank.size}L</Text>
-            {/* Add inputs here for Weights, Costs, and Transport */}
-            <Text>Transport Cost (₹)</Text>
-            <TextInput 
-              style={styles.input} 
-              keyboardType="numeric" 
-              value={String(tank.costs.transport || '')} 
-              onChangeText={(val) => handleCostChange(tank.id, 'transport', val)} 
-            />
+            <Text style={styles.sectionTitle}>{tank.size}L Tank Configuration</Text>
+            
+            <Text style={styles.subTitle}>Layer Weights (kg)</Text>
+            <View style={styles.layerRow}>
+              {tank.weights.map((w, i) => (
+                <TextInput key={i} style={styles.miniInput} value={String(w)} onChangeText={(v) => updateWeight(tank.id, i, v)} keyboardType="numeric" />
+              ))}
+            </View>
+
+            <Text style={styles.subTitle}>Manufacturing & Transport Costs (₹)</Text>
+            <View style={styles.costGrid}>
+              {Object.entries(tank.costs).map(([key, val]) => (
+                <View key={key} style={styles.costItem}>
+                  <Text style={styles.costLabel}>{key.toUpperCase()}</Text>
+                  <TextInput style={styles.input} value={String(val)} onChangeText={(v) => updateCost(tank.id, key, v)} keyboardType="numeric" />
+                </View>
+              ))}
+            </View>
           </View>
         ))}
 
-        <TouchableOpacity style={styles.addBtn} onPress={addTank}><Text>+ Add Tank</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.addBtn} onPress={addTank}><Text style={styles.addBtnText}>+ Add New Tank</Text></TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
   header: { backgroundColor: '#2563eb', padding: 20, alignItems: 'center' },
-  headerTitle: { color: 'white', fontWeight: 'bold', fontSize: 18 },
+  headerTitle: { color: 'white', fontWeight: 'bold', fontSize: 20 },
   scroll: { padding: 16 },
-  card: { backgroundColor: 'white', padding: 16, borderRadius: 10, marginBottom: 16 },
-  cardTitle: { fontWeight: 'bold', marginBottom: 10 },
-  row: { flexDirection: 'row', justifyContent: 'space-around' },
-  btn: { padding: 10, backgroundColor: '#e2e8f0', borderRadius: 5 },
-  activeBtn: { backgroundColor: '#2563eb' },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 8, borderRadius: 5, marginTop: 5 },
-  addBtn: { padding: 15, backgroundColor: '#dbeafe', alignItems: 'center', borderRadius: 10 }
+  card: { backgroundColor: 'white', padding: 16, borderRadius: 12, marginBottom: 16, elevation: 2 },
+  sectionTitle: { fontWeight: 'bold', fontSize: 16, marginBottom: 12, color: '#1e293b' },
+  subTitle: { fontSize: 12, color: '#64748b', marginBottom: 8, marginTop: 4 },
+  layerRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  miniInput: { width: '18%', borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, padding: 8, textAlign: 'center' },
+  costGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  costItem: { width: '48%', marginBottom: 10 },
+  costLabel: { fontSize: 10, color: '#94a3b8' },
+  input: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, padding: 8, marginTop: 4 },
+  addBtn: { backgroundColor: '#eff6ff', padding: 16, alignItems: 'center', borderRadius: 10, borderStyle: 'dashed', borderWidth: 2, borderColor: '#3b82f6' },
+  addBtnText: { color: '#2563eb', fontWeight: 'bold' }
 });
